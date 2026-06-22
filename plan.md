@@ -20,6 +20,25 @@ backend will permanently disagree with each other.
 
 ---
 
+## 0.5 Current state vs. target state
+
+**Confirmed frontend flow:**
+Landing page → Google OAuth (mocked) → enter Anna API key (mocked) → SDK chat
+page → typing `/vibe` triggers the file-structure UI.
+
+**Confirmed symptoms (why each piece is broken):**
+
+| Symptom | Root cause | Fixed by |
+|---|---|---|
+| File structure appears but is empty | `/vibe` only renders the hardcoded mock tree — no `generate_project` tool exists, so no real content is ever written to disk | Section 3 (`generate_project` tool) |
+| Download ZIP does nothing | There are no real files on disk to zip — nothing for the button to point at | Section 3/6 (`zip_project` tool + real route) |
+| Preview/sandbox doesn't work | No serving mechanism exists; also previously scoped as a live Vite dev server, which is unnecessary complexity now that output is vanilla HTML/JS | Section 5 (static file serve, no build step, no process spawning) |
+
+Onboarding (Google OAuth + Anna API key) is intentionally left mocked — not
+in scope for this build pass.
+
+---
+
 ## 1. Architecture overview
 
 ```
