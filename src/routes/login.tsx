@@ -82,25 +82,15 @@ function LoginPage() {
             )}
           </button>
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {/* <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <div className="h-px flex-1 bg-border" />
             and
             <div className="h-px flex-1 bg-border" />
-          </div>
+          </div> */}
 
           {/* API key */}
-          <div className="rounded-2xl border border-border bg-card p-5">
-            <label className="flex items-center justify-between text-sm font-medium">
-              <span className="flex items-center gap-2">
-                <KeyRound className="h-4 w-4" /> Anna API Key
-              </span>
-              <span className="group relative">
-                <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="pointer-events-none absolute right-0 top-5 z-10 w-56 rounded-md border border-border bg-popover p-2 text-[11px] text-popover-foreground opacity-0 shadow-md transition group-hover:opacity-100">
-                  You'll need an Anna AI API key to use this app. Get yours at anna.partners.
-                </span>
-              </span>
-            </label>
+          {/* <div className="rounded-2xl border border-border bg-card p-5">
+            
             <div className="mt-3 flex gap-2">
               <input
                 value={apiKey}
@@ -128,7 +118,7 @@ function LoginPage() {
             <p className="mt-3 text-[11px] text-muted-foreground">
               No key handy? Use anything — this demo is mocked.
             </p>
-          </div>
+          </div> */}
         </div>
       </main>
     </div>
