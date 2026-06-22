@@ -151,6 +151,66 @@ elNewSessionBtn.addEventListener("click", () => {
 });
 
 
+// ── Fallback templates (used when Anna's token budget is exhausted) ────────
+function fallbackAppJs(desc) {
+  return `const { useState, useEffect } = React;
+function App() {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("visible")),
+      { threshold: 0.1 }
+    );
+    document.querySelectorAll("section").forEach((s) => observer.observe(s));
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <>
+      <nav className="sv-nav">
+        <span style={{fontWeight:900,fontSize:"1.2rem"}}>⚡ ${desc}</span>
+      </nav>
+      <section className="sv-hero">
+        <div>
+          <h1>${desc}</h1>
+          <p>Something amazing is coming. Stay tuned.</p>
+          <button className="sv-btn">Get Started</button>
+        </div>
+      </section>
+      <section className="sv-features">
+        <div className="features-grid">
+          {[["🚀","Fast","Built for speed"],["🎯","Focused","Crafted with purpose"],["💡","Smart","Powered by insight"]].map(([icon,title,body])=>(
+            <div key={title} className="sv-card"><div style={{fontSize:"2rem"}}>{icon}</div><h3>{title}</h3><p>{body}</p></div>
+          ))}
+        </div>
+      </section>
+      <section className="sv-cta"><h2>Ready to begin?</h2><p>Join us today.</p><button className="sv-btn">Start Now</button></section>
+      <footer className="sv-footer"><p>© ${new Date().getFullYear()} ${desc}</p></footer>
+    </>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);`;
+}
+
+function fallbackCss() {
+  return `:root{--bg:#0a0a0a;--card:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.1);--accent:#7c3aed;--text:#f0f0f0;--muted:#888}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);scroll-behavior:smooth}
+.sv-nav{position:fixed;top:0;width:100%;backdrop-filter:blur(16px);background:rgba(0,0,0,0.6);border-bottom:1px solid var(--border);z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:68px;opacity:1;transform:none}
+.sv-btn{background:var(--accent);color:#fff;font-weight:700;border:none;border-radius:8px;padding:12px 28px;cursor:pointer;transition:all 0.2s}
+.sv-btn:hover{filter:brightness(1.1);transform:scale(1.05)}
+.sv-hero{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:80px 40px 40px;background:radial-gradient(ellipse at center,rgba(124,58,237,0.15) 0%,var(--bg) 70%)}
+.sv-hero h1{font-size:clamp(2.8rem,6vw,5.5rem);font-weight:900;line-height:1.08}
+.sv-hero p{font-size:1.2rem;color:var(--muted);max-width:560px;margin:24px auto}
+.sv-features,.sv-stats,.sv-cta{max-width:1100px;margin:0 auto;padding:96px 40px}
+.features-grid,.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.sv-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px;transition:transform 0.25s}
+.sv-card:hover{transform:translateY(-8px)}
+.sv-cta{text-align:center}.sv-cta h2{font-size:2.4rem}.sv-cta p{color:var(--muted);margin:20px 0 36px}
+.sv-footer{border-top:1px solid var(--border);padding:40px;text-align:center;color:var(--muted);font-size:0.9rem}
+section{opacity:0;transform:translateY(40px);transition:opacity 0.7s ease,transform 0.7s ease}
+section.visible{opacity:1;transform:none}
+@media(max-width:768px){.features-grid,.stats-grid{grid-template-columns:1fr}.sv-nav{padding:0 20px}}`;
+}
+
 // ── Generation ────────────────────────────────────────────────────────────
 // Single landing page per prompt — one LLM call, one HTML file.
 // maxTokens:2000 ensures the model has budget left after any internal thinking.
@@ -198,6 +258,8 @@ async function callAnnaRaw(userText, systemText, maxTokens = 2000) {
         throw new Error("Anna LLM is disabled. Run: anna-app login --host https://anna.partners then restart start-anna.cmd");
       if (/verified developer|developer.*required/i.test(msg))
         throw new Error("Anna requires verified developer access. Apply at anna.partners/developers");
+      if (/context.length|token.limit|max.token|quota|rate.limit|overload/i.test(msg))
+        throw new Error("Anna token budget exhausted. Try a shorter prompt or wait a moment, then retry.");
       throw err;
     }
 
@@ -272,13 +334,15 @@ async function generateWithAnna(desc) {
   let appContent;
   try {
     appContent = await callAnnaRaw(appPrompt, systemRaw(), 2000);
-    allFiles.push({ path: "App.js", content: appContent });
-    await writeFiles([{ path: "App.js", content: appContent }]);
-    await loadFileTree();
     updateMsg(divApp, "✓ App.js");
   } catch (err) {
-    updateMsg(divApp, `✗ App.js: ${err.message} (skipped)`);
+    console.warn("[anna-vibe] App.js generation failed, using fallback:", err.message);
+    appContent = fallbackAppJs(desc);
+    updateMsg(divApp, `⚠ App.js: used fallback template (${err.message})`);
   }
+  allFiles.push({ path: "App.js", content: appContent });
+  await writeFiles([{ path: "App.js", content: appContent }]);
+  await loadFileTree();
 
   // ── Step 3: style.css ───────────────────────────────────────────────────
   const divCss = addMsg("tool", "▸ Writing style.css…");
@@ -312,14 +376,16 @@ async function generateWithAnna(desc) {
   let cssContent;
   try {
     cssContent = await callAnnaRaw(cssPrompt, systemRaw(), 2000);
-    allFiles.push({ path: "style.css", content: cssContent });
-    await writeFiles([{ path: "style.css", content: cssContent }]);
-    await loadFileTree();
-    await loadFile("index.html");
     updateMsg(divCss, "✓ style.css — React app ready!");
   } catch (err) {
-    updateMsg(divCss, `✗ style.css: ${err.message} (skipped)`);
+    console.warn("[anna-vibe] style.css generation failed, using fallback:", err.message);
+    cssContent = fallbackCss();
+    updateMsg(divCss, `⚠ style.css: used fallback styles (${err.message})`);
   }
+  allFiles.push({ path: "style.css", content: cssContent });
+  await writeFiles([{ path: "style.css", content: cssContent }]);
+  await loadFileTree();
+  await loadFile("index.html");
 
   return { files: allFiles, spec: { name: desc } };
 }
