@@ -188,28 +188,52 @@ async function callAnnaLLM(userText, systemText, maxTokens = 4000) {
     throw err;
   }
 
-  // Anna returns content in several possible shapes — handle all of them
-  let text =
-    result?.content?.[0]?.text    // array of content blocks
-    ?? result?.content?.text       // single block with .text
-    ?? result?.content             // raw string content
-    ?? result?.text                // top-level text
-    ?? result;
+  // Log the raw result so we can debug response shape issues
+  console.log("[anna-vibe] raw result:", JSON.stringify(result).slice(0, 600));
 
-  if (typeof text !== "string") text = JSON.stringify(text);
-  // Strip markdown code fences if the model wrapped in ```json…```
-  text = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
-  return JSON.parse(text);
+  // Check for an explicit error envelope (ok: false)
+  if (result?.ok === false) {
+    throw new Error(`Anna API error: ${result?.error?.message ?? result?.error?.code ?? "unknown"}`);
+  }
+
+  // Try every known content-shape. Use || not ?? so empty strings ("") fall through.
+  const text =
+    (typeof result?.content?.[0]?.text === "string" && result.content[0].text)  // [{type,text}]
+    || (typeof result?.content?.text === "string" && result.content.text)        // {type,text}
+    || (typeof result?.content === "string" && result.content)                   // plain string
+    || (typeof result?.text === "string" && result.text)                         // top-level text
+    || (typeof result?.result?.content?.[0]?.text === "string" && result.result.content[0].text) // wrapped
+    || (typeof result?.result?.content?.text === "string" && result.result.content.text)         // wrapped
+    || "";
+
+  if (!text.trim()) {
+    throw new Error(
+      `Anna returned an empty response.\n` +
+      `Raw: ${JSON.stringify(result).slice(0, 300)}\n\n` +
+      `Check browser DevTools console (F12) for the full [anna-vibe] log.`
+    );
+  }
+
+  // Strip markdown code fences if Anna wrapped the JSON in ` ``` `
+  const clean = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+  return JSON.parse(clean);
 }
 
 // ── Multi-step generation ──────────────────────────────────────────────────
 // Anna builds the site page by page. Each call is focused and short, giving
 // better quality and real progressive output.
 
-const SYSTEM_DESIGNER = `You are an elite creative web designer and front-end developer.
-You MUST always respond with valid JSON only — no markdown, no explanation, no code fences.
-Create stunning, unique, production-quality designs. Never use placeholder/lorem ipsum text.
-${skillText}`;
+// Returns the system prompt at call-time so skillText is already loaded
+function systemDesigner() {
+  return (
+    "You are an elite creative web designer and front-end developer.\n" +
+    "CRITICAL: respond with ONLY a raw JSON object — absolutely no markdown, " +
+    "no ```json fences, no explanation text before or after. " +
+    "The very first character of your response must be { and the last must be }.\n" +
+    "Create stunning, unique, production-quality designs. Never use lorem ipsum.\n" +
+    (skillText ? skillText + "\n" : "")
+  );
+}
 
 async function generateDesignSpec(desc) {
   const prompt = `Client request: "${desc}"
@@ -240,7 +264,7 @@ IMPORTANT:
 - palette must use dark theme — bg should be very dark (#0x0x0x range)
 - accent color must be vivid and distinctive, NOT generic blue or white`;
 
-  return callAnnaLLM(prompt, SYSTEM_DESIGNER, 1000);
+  return callAnnaLLM(prompt, systemDesigner(), 1000);
 }
 
 async function generateCoreFiles(desc, spec) {
@@ -277,7 +301,7 @@ Create these 3 files:
 
 Return JSON: { "files": [ { "path": "...", "content": "..." }, ... ] }`;
 
-  return callAnnaLLM(prompt, SYSTEM_DESIGNER, 4000);
+  return callAnnaLLM(prompt, systemDesigner(), 4000);
 }
 
 async function generatePage(desc, spec, pageName) {
@@ -323,7 +347,7 @@ TECHNICAL RULES:
 
 Return JSON: { "path": "screens/${pageName}.js", "content": "complete window.render... function" }`;
 
-  return callAnnaLLM(prompt, SYSTEM_DESIGNER, 3500);
+  return callAnnaLLM(prompt, systemDesigner(), 3500);
 }
 
 async function generateWithAnna(desc) {
@@ -399,7 +423,7 @@ Return JSON: { "content": "the complete updated file — no truncation, full rep
 
   let result;
   try {
-    result = await callAnnaLLM(prompt, SYSTEM_DESIGNER, 4000);
+    result = await callAnnaLLM(prompt, systemDesigner(), 4000);
     if (!result?.content || typeof result.content !== "string")
       throw new Error("Anna returned an unexpected edit format");
   } catch (err) {
