@@ -164,42 +164,57 @@ function systemRaw() {
 }
 
 // Calls Anna and returns raw text (no JSON.parse).
+function extractText(result) {
+  return (
+    (typeof result?.content?.[0]?.text === "string" && result.content[0].text) ||
+    (typeof result?.content?.text  === "string" && result.content.text)  ||
+    (typeof result?.content        === "string" && result.content)        ||
+    (typeof result?.text           === "string" && result.text)           ||
+    ""
+  );
+}
+
+// Two-attempt strategy:
+//   Attempt 1 — /no_think prefix + temperature 0.7  (fast, no thinking overhead)
+//   Attempt 2 — no prefix, temperature 0            (let model think but full budget for output)
 async function callAnnaRaw(userText, systemText, maxTokens = 2000) {
-  const messageText = "/no_think\n" + userText;
-  let result;
-  try {
-    result = await anna.llm.complete({
-      messages: [{ role: "user", content: { type: "text", text: messageText } }],
-      systemPrompt: systemText,
-      maxTokens,
-      temperature: 0.7,
-    });
-  } catch (err) {
-    const msg = err?.message ?? String(err);
-    if (/llm_disabled|no.llm|disabled/i.test(msg))
-      throw new Error("Anna LLM is disabled. Run: anna-app login --host https://anna.partners then restart start-anna.cmd");
-    if (/verified developer|developer.*required/i.test(msg))
-      throw new Error("Anna requires verified developer access. Apply at anna.partners/developers");
-    throw err;
+  const attempts = [
+    { text: "/no_think\n" + userText, temperature: 0.7, label: "no_think" },
+    { text: userText,                  temperature: 0,   label: "with_think" },
+  ];
+
+  for (const { text: msgText, temperature, label } of attempts) {
+    let result;
+    try {
+      result = await anna.llm.complete({
+        messages: [{ role: "user", content: { type: "text", text: msgText } }],
+        systemPrompt: systemText,
+        maxTokens,
+        temperature,
+      });
+    } catch (err) {
+      const msg = err?.message ?? String(err);
+      if (/llm_disabled|no.llm|disabled/i.test(msg))
+        throw new Error("Anna LLM is disabled. Run: anna-app login --host https://anna.partners then restart start-anna.cmd");
+      if (/verified developer|developer.*required/i.test(msg))
+        throw new Error("Anna requires verified developer access. Apply at anna.partners/developers");
+      throw err;
+    }
+
+    console.log(`[anna-vibe] ${label}:`, JSON.stringify(result).slice(0, 300));
+
+    if (result?.ok === false)
+      throw new Error(`Anna error: ${result?.error?.message ?? result?.error?.code ?? "unknown"}`);
+
+    const text = extractText(result);
+    if (text.trim()) {
+      return text.replace(/^```[\w]*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
+    }
+
+    console.log(`[anna-vibe] ${label} returned empty — ${label === "no_think" ? "retrying without /no_think…" : "giving up"}`);
   }
 
-  console.log("[anna-vibe] raw:", JSON.stringify(result).slice(0, 400));
-
-  if (result?.ok === false)
-    throw new Error(`Anna error: ${result?.error?.message ?? result?.error?.code ?? "unknown"}`);
-
-  const text =
-    (typeof result?.content?.[0]?.text === "string" && result.content[0].text) ||
-    (typeof result?.content?.text === "string" && result.content.text) ||
-    (typeof result?.content === "string" && result.content) ||
-    (typeof result?.text === "string" && result.text) ||
-    "";
-
-  if (!text.trim())
-    throw new Error(`Anna returned empty content. Raw: ${JSON.stringify(result).slice(0, 200)}`);
-
-  // Strip markdown fences if present
-  return text.replace(/^```[\w]*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
+  throw new Error("Anna returned empty content on both attempts. The model may be overloaded — try again in a moment.");
 }
 
 async function generateWithAnna(desc) {
