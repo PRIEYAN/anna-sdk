@@ -1,4 +1,3 @@
-import { editProjectFile, generateProject } from "./generator.js";
 import { listProjectFiles, readProjectFile } from "./workspace.js";
 
 export async function dispatchRpc(request) {
@@ -6,12 +5,8 @@ export async function dispatchRpc(request) {
     throw new Error("Invalid JSON-RPC request");
   const params = request.params ?? {};
   let result;
-  if (request.method === "generate_project")
-    result = await generateProject(params.sessionId, params.prompt ?? "");
-  else if (request.method === "read_file")
+  if (request.method === "read_file")
     result = { content: await readProjectFile(params.sessionId, params.path) };
-  else if (request.method === "edit_file")
-    result = await editProjectFile(params.sessionId, params.path, params.instruction ?? "");
   else if (request.method === "list_files")
     result = { tree: await listProjectFiles(params.sessionId) };
   else throw new Error(`Unknown method: ${request.method}`);
