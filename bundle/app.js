@@ -203,44 +203,110 @@ async function callAnnaRaw(userText, systemText, maxTokens = 2000) {
 }
 
 async function generateWithAnna(desc) {
-  const div = addMsg("tool", "▸ Anna is crafting your landing page…");
+  const allFiles = [];
 
-  const prompt =
-    `Create a complete, creative single-page landing page HTML file for: "${desc}"\n\n` +
-    `Requirements:\n` +
-    `- Invent a bold brand name and memorable tagline for this business\n` +
-    `- All CSS inside a <style> tag in <head>; all JS inside a <script> tag before </body>\n` +
-    `- Dark background (#0d0d0d or similar), a vivid unique accent color, near-white body text\n` +
-    `- Google Fonts API <link> in <head> (choose a font that fits the brand personality)\n` +
-    `- Font Awesome 6.5 CDN <link> in <head> for icons\n` +
-    `- Sections (in order): sticky nav, full-height hero with gradient overlay, ` +
-    `3-column features section, a stats/testimonial row, a CTA section, footer\n` +
-    `- CSS @keyframes animations (fadeIn, slideUp); smooth hover transitions on buttons and cards\n` +
-    `- Real invented content — names, descriptions, numbers — nothing generic or lorem ipsum\n` +
-    `- Fully responsive (mobile-friendly with @media queries)\n\n` +
-    `Output raw HTML only. Start with <!DOCTYPE html>. No explanation text.`;
+  // ── Step 1: index.html — React CDN loader ──────────────────────────────
+  const divHtml = addMsg("tool", "▸ Writing index.html…");
+  const htmlPrompt =
+    `Generate index.html for a React CDN app about: "${desc}"\n\n` +
+    `<head> must include EXACTLY these tags in order:\n` +
+    `1. <meta charset="UTF-8">\n` +
+    `2. <meta name="viewport" content="width=device-width, initial-scale=1.0">\n` +
+    `3. <title> — invent a short brand name for "${desc}"\n` +
+    `4. Google Fonts API <link> — choose one font that fits the brand personality (weights 400;700;900)\n` +
+    `5. Font Awesome 6.5: <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">\n` +
+    `6. <link rel="stylesheet" href="style.css">\n` +
+    `7. <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>\n` +
+    `8. <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>\n` +
+    `9. <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\n\n` +
+    `<body>: <div id="root"></div>\n` +
+    `Last tag: <script type="text/babel" src="App.js"></script>\n\n` +
+    `Output raw HTML only. Start with <!DOCTYPE html>. Nothing else.`;
 
-  let html;
+  let htmlContent;
   try {
-    html = await callAnnaRaw(prompt, systemRaw(), 2000);
+    htmlContent = await callAnnaRaw(htmlPrompt, systemRaw(), 600);
+    allFiles.push({ path: "index.html", content: htmlContent });
+    await writeFiles([{ path: "index.html", content: htmlContent }]);
+    await loadFileTree();
+    updateMsg(divHtml, "✓ index.html");
   } catch (err) {
-    updateMsg(div, `✗ Failed: ${err.message}`);
+    updateMsg(divHtml, `✗ index.html: ${err.message}`);
     throw err;
   }
 
-  // Ensure we got something that looks like HTML
-  if (!html.includes("<")) {
-    updateMsg(div, "✗ Anna returned unexpected content (not HTML)");
-    throw new Error("Anna did not return HTML. Check DevTools console for the raw response.");
+  // ── Step 2: App.js — full React component ──────────────────────────────
+  const divApp = addMsg("tool", "▸ Writing App.js (React component)…");
+  const appPrompt =
+    `Write App.js — a complete React single-page landing page for: "${desc}"\n\n` +
+    `MUST start with:\n` +
+    `const { useState, useEffect, useRef } = React;\n\n` +
+    `MUST end with:\n` +
+    `ReactDOM.createRoot(document.getElementById('root')).render(<App />);\n\n` +
+    `Sections inside function App():\n` +
+    `1. Sticky <nav className="sv-nav"> — logo text (invent brand name) + 3 links + .sv-btn; useState for mobile menu\n` +
+    `2. <section className="sv-hero"> — full-viewport hero, big h1, subtitle, 2 buttons (.sv-btn and .sv-btn-ghost)\n` +
+    `3. <section className="sv-features"> — h2 heading, 3 .sv-card divs each with FA6 <i> icon, h3, p\n` +
+    `4. <section className="sv-stats"> — 3 .sv-stat items with big bold number and label\n` +
+    `5. <section className="sv-cta"> — bold h2, p, .sv-btn\n` +
+    `6. <footer className="sv-footer"> — brand, tagline, © ${new Date().getFullYear()}\n\n` +
+    `Add useEffect: IntersectionObserver that adds class "visible" to each section when scrolled into view.\n` +
+    `Invent real content: brand name, feature titles/descriptions, stats numbers, CTA text — all specific to "${desc}".\n` +
+    `No lorem ipsum. Use className everywhere (not class).`;
+
+  let appContent;
+  try {
+    appContent = await callAnnaRaw(appPrompt, systemRaw(), 2000);
+    allFiles.push({ path: "App.js", content: appContent });
+    await writeFiles([{ path: "App.js", content: appContent }]);
+    await loadFileTree();
+    updateMsg(divApp, "✓ App.js");
+  } catch (err) {
+    updateMsg(divApp, `✗ App.js: ${err.message} (skipped)`);
   }
 
-  const file = { path: "index.html", content: html };
-  await writeFiles([file]);
-  await loadFileTree();
-  await loadFile("index.html");
-  updateMsg(div, "✓ Landing page ready");
+  // ── Step 3: style.css ───────────────────────────────────────────────────
+  const divCss = addMsg("tool", "▸ Writing style.css…");
+  const cssPrompt =
+    `Write style.css for a bold React landing page about "${desc}".\n\n` +
+    `:root — pick colors that suit "${desc}" perfectly:\n` +
+    `--bg (very dark, #0a0a0a range), --card (dark glass: rgba dark), --border (subtle rgba white), ` +
+    `--accent (ONE vivid brand color — NOT blue or white), --text (#f0f0f0), --muted (#888)\n\n` +
+    `Required styles:\n` +
+    `* *, *::before, *::after { box-sizing:border-box; margin:0; padding:0 }\n` +
+    `* body — font from Google Fonts (match index.html), background:var(--bg), color:var(--text), scroll-behavior:smooth\n` +
+    `* .sv-nav — position:fixed, top:0, width:100%, backdrop-filter:blur(16px), background:rgba(0,0,0,0.6), border-bottom:1px solid var(--border), z-index:100, display:flex, align-items:center, justify-content:space-between, padding:0 48px, height:68px\n` +
+    `* .sv-btn — background:var(--accent), color:#000 or #fff (whichever contrasts), font-weight:700, border:none, border-radius:8px, padding:12px 28px, cursor:pointer, transition:all 0.2s, hover:scale(1.05)+brightness(1.1)\n` +
+    `* .sv-btn-ghost — background:transparent, border:2px solid var(--accent), color:var(--accent), same padding/radius, hover:background:var(--accent)+color flip\n` +
+    `* .sv-hero — min-height:100vh, display:flex, align-items:center, justify-content:center, text-align:center, padding:80px 40px 40px, background: radial-gradient or linear-gradient using --bg and --accent tones\n` +
+    `* .sv-hero h1 — font-size:clamp(2.8rem,6vw,5.5rem), font-weight:900, line-height:1.08, letter-spacing:-0.02em\n` +
+    `* .sv-hero p — font-size:1.2rem, color:var(--muted), max-width:560px, margin:24px auto\n` +
+    `* .sv-features, .sv-stats, .sv-cta — max-width:1100px, margin:0 auto, padding:96px 40px\n` +
+    `* .sv-card — background:var(--card), border:1px solid var(--border), border-radius:16px, padding:36px, backdrop-filter:blur(8px), transition:transform 0.25s+box-shadow 0.25s, hover:translateY(-8px)+box-shadow 0 20px 60px rgba(accent,0.15)\n` +
+    `* .features-grid, .stats-grid — display:grid, grid-template-columns:repeat(3,1fr), gap:28px\n` +
+    `* .sv-stat — text-align:center; h2 font-size:3rem, font-weight:900, color:var(--accent); p color:var(--muted)\n` +
+    `* .sv-cta — text-align:center; h2 font-size:2.4rem; p color:var(--muted), margin:20px 0 36px\n` +
+    `* .sv-footer — border-top:1px solid var(--border), padding:40px, text-align:center, color:var(--muted), font-size:0.9rem\n` +
+    `* section { opacity:0; transform:translateY(40px); transition:opacity 0.7s ease, transform 0.7s ease }\n` +
+    `* section.visible { opacity:1; transform:none }\n` +
+    `* .sv-nav { opacity:1; transform:none }\n` +
+    `* @keyframes fadeIn { from{opacity:0} to{opacity:1} }\n` +
+    `* @media(max-width:768px) — .features-grid, .stats-grid: grid-template-columns:1fr; padding reduced; hero h1 smaller\n\n` +
+    `Output raw CSS only. No inline comments.`;
 
-  return { files: [file], spec: { name: desc } };
+  let cssContent;
+  try {
+    cssContent = await callAnnaRaw(cssPrompt, systemRaw(), 2000);
+    allFiles.push({ path: "style.css", content: cssContent });
+    await writeFiles([{ path: "style.css", content: cssContent }]);
+    await loadFileTree();
+    await loadFile("index.html");
+    updateMsg(divCss, "✓ style.css — React app ready!");
+  } catch (err) {
+    updateMsg(divCss, `✗ style.css: ${err.message} (skipped)`);
+  }
+
+  return { files: allFiles, spec: { name: desc } };
 }
 
 // Writes a batch of files to disk via the Agent server
@@ -297,7 +363,7 @@ async function handleSend() {
     if (text.startsWith("/vibe")) {
       const desc = text.replace(/^\/vibe\b/, "").trim() || "a creative landing page";
       addMsg("tool", `→ generate_project("${desc}")`);
-      addMsg("assistant", "Anna AI is building your landing page — takes ~15 seconds…");
+      addMsg("assistant", "Anna AI is building a React landing page — takes ~20 seconds…");
 
       const { files, spec } = await generateWithAnna(desc);
 
@@ -306,13 +372,13 @@ async function handleSend() {
       elVersionLabel.textContent = `${spec.name} · v${projectVersion}`;
       elDownloadBtn.disabled = false;
       await loadFileTree();
-      await loadFile("screens/home.js");
+      await loadFile("index.html");
 
       addMsg("tool", `✓ Done — ${files.length} files written by Anna AI`);
-      addMsg("assistant", `"${spec.name}" is ready! Switch to Preview, or tell me what to change.`);
+      addMsg("assistant", `Landing page is ready! Switch to Preview, or tell me what to change.`);
 
     } else if (hasProject) {
-      const target = selectedFile || "screens/home.js";
+      const target = selectedFile || "index.html";
       addMsg("tool", `→ edit_file("${target}")`);
 
       const fileRes = await fetch(
@@ -367,7 +433,7 @@ async function boot() {
       "  /vibe a chatting app with dark neon theme\n" +
       "  /vibe an ecommerce store for handmade jewellery\n" +
       "  /vibe a fitness studio landing page\n\n" +
-      "Anna builds a unique landing page for each prompt — takes ~15 seconds."
+      "Anna builds a unique React landing page for each prompt — takes ~20 seconds."
     );
   } catch (err) {
     console.error("[anna-vibe] Anna connect failed:", err);
