@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const a = require\\('archiver'\\); console.log\\(typeof a, Object.keys\\(a\\).slice\\(0,10\\)\\)\")",
+      "Bash(node --input-type=module -e \"import a from 'archiver'; console.log\\(typeof a\\)\")"
+    ]
+  }
+}

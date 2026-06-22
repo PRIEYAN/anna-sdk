@@ -1,0 +1,26 @@
+{
+  "schema": 2,
+  "permissions": [],
+  "ui": {
+    "bundle": {
+      "format": "static-spa",
+      "entry": "index.html"
+    },
+    "host_api": {
+      "llm": ["complete"]
+    },
+    "views": [
+      {
+        "name": "main",
+        "title": "Vibe Coder",
+        "default": true,
+        "entry": "index.html",
+        "min_size": { "w": 900, "h": 600 },
+        "default_size": { "w": 1400, "h": 800 },
+        "resizable": true,
+        "movable": true,
+        "single_instance": true
+      }
+    ]
+  }
+}

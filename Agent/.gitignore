@@ -1,0 +1,5 @@
+node_modules/
+workspaces/*
+!workspaces/.gitignore
+.env
+*.log

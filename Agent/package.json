@@ -1,0 +1,14 @@
+{
+  "name": "anna-backend-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "archiver": "^8.0.0"
+  }
+}

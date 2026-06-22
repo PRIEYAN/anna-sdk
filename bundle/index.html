@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vibe Coder · Anna SDK</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="32" height="32" rx="8" fill="oklch(0.72 0.14 150)"/>
+        <path d="M16 7c1 5 4 8 9 9-5 1-8 4-9 9-1-5-4-8-9-9 5-1 8-4 9-9Z" fill="white"/>
+      </svg>
+      <span class="app-name">Anna SDK</span>
+      <span class="badge">Powered by Anna AI</span>
+    </div>
+    <div class="header-right">
+      <button id="new-session-btn" class="btn-outline" title="Start a new session">New Session</button>
+      <button id="download-btn" class="btn-primary" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download ZIP
+      </button>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- Chat panel -->
+    <section class="chat-panel">
+      <div id="chat-messages" class="messages"></div>
+      <div id="busy" class="busy-bar" style="display:none">
+        <span class="busy-dot"></span>
+        <span class="busy-dot"></span>
+        <span class="busy-dot"></span>
+        <span>anna is working…</span>
+      </div>
+      <div class="input-area">
+        <textarea id="chat-input" rows="2" placeholder="/vibe a professional ecommerce website"></textarea>
+        <button id="send-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <p class="hint">Try: <code>/vibe a ceramic artist portfolio</code></p>
+    </section>
+
+    <!-- Right panel -->
+    <section class="right-panel">
+      <div class="tab-bar">
+        <div class="tabs">
+          <button id="tab-code" class="tab active">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Files &amp; Code
+          </button>
+          <button id="tab-preview" class="tab">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Preview
+          </button>
+        </div>
+        <span id="version-label" class="version-label">no project</span>
+      </div>
+
+      <!-- Code panel -->
+      <div id="code-panel" class="code-panel">
+        <aside class="file-tree-pane">
+          <div id="file-tree" class="file-tree">
+            <div class="empty-hint">File tree appears here after /vibe</div>
+          </div>
+        </aside>
+        <div class="code-view-pane">
+          <div class="code-path-bar">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span id="selected-file-label">—</span>
+          </div>
+          <pre id="code-view" class="code-content">// generate a project with /vibe to see code</pre>
+        </div>
+      </div>
+
+      <!-- Preview panel -->
+      <div id="preview-panel" class="preview-panel" hidden>
+        <div class="browser-chrome">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+          <span id="preview-url-bar" class="url-bar">—</span>
+        </div>
+        <iframe id="preview-frame" title="Generated project preview"></iframe>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

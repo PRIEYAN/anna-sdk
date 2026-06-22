@@ -5,7 +5,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Anna SDK — Vibe-code React apps by chat" },
-      { name: "description", content: "Anna SDK lets you scaffold tiny React + Vite websites by chatting with an AI agent. Built on Anna AI Executa tools." },
+      { name: "description", content: "Anna SDK lets you scaffold tiny vanilla HTML + JavaScript websites by chatting with an AI agent. Built on Anna AI Executa tools." },
     ],
   }),
   component: Landing,
@@ -140,7 +140,7 @@ function Landing() {
                 n: "02",
                 icon: Sparkles,
                 t: "Generate",
-                d: "Anna's Executa tools scaffold a real Vite + React project with a fixed, predictable file structure.",
+                d: "Anna's Executa tools scaffold a real vanilla HTML + JavaScript project with a fixed, predictable file structure.",
               },
               {
                 n: "03",
