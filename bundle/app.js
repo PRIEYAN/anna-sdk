@@ -154,13 +154,17 @@ elNewSessionBtn.addEventListener("click", () => {
 // Calls anna.llm.complete() and parses the JSON result.
 // Does NOT silently swallow errors — callers must handle them.
 async function callAnnaLLM(userText, systemText, maxTokens = 4000) {
+  // Qwen3 needs /no_think prefix to skip extended-thinking mode and produce real output.
+  // Without it the model spends all tokens on internal reasoning and returns text: "".
+  const messageText = "/no_think\n" + userText;
+
   let result;
   try {
     result = await anna.llm.complete({
-      messages: [{ role: "user", content: { type: "text", text: userText } }],
+      messages: [{ role: "user", content: { type: "text", text: messageText } }],
       systemPrompt: systemText,
       maxTokens,
-      temperature: 0.75,
+      temperature: 0.7,
     });
   } catch (err) {
     // Surface Anna-specific errors with actionable messages
@@ -227,6 +231,8 @@ async function callAnnaLLM(userText, systemText, maxTokens = 4000) {
 function systemDesigner() {
   return (
     "You are an elite creative web designer and front-end developer.\n" +
+    "DO NOT use extended thinking or chain-of-thought reasoning. " +
+    "Output your answer immediately and directly.\n" +
     "CRITICAL: respond with ONLY a raw JSON object — absolutely no markdown, " +
     "no ```json fences, no explanation text before or after. " +
     "The very first character of your response must be { and the last must be }.\n" +
