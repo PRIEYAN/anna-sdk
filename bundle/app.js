@@ -1,6 +1,5 @@
 // Anna App Runtime — served by anna-app dev harness
 import { AnnaAppRuntime } from "/static/anna-apps/_sdk/latest/index.js";
-import { generateSite } from "./generator.js";
 
 const BACKEND = "http://localhost:8787";
 
@@ -20,27 +19,29 @@ const sessionId = (() => {
 })();
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
-const elMessages = document.getElementById("chat-messages");
-const elInput = document.getElementById("chat-input");
-const elSendBtn = document.getElementById("send-btn");
-const elBusy = document.getElementById("busy");
-const elFileTree = document.getElementById("file-tree");
-const elCodeView = document.getElementById("code-view");
-const elSelectedLabel = document.getElementById("selected-file-label");
-const elPreviewFrame = document.getElementById("preview-frame");
-const elPreviewUrlBar = document.getElementById("preview-url-bar");
-const elDownloadBtn = document.getElementById("download-btn");
-const elVersionLabel = document.getElementById("version-label");
-const elTabCode = document.getElementById("tab-code");
+const elMessages   = document.getElementById("chat-messages");
+const elInput      = document.getElementById("chat-input");
+const elSendBtn    = document.getElementById("send-btn");
+const elBusy       = document.getElementById("busy");
+const elFileTree   = document.getElementById("file-tree");
+const elCodeView   = document.getElementById("code-view");
+const elSelectedLabel  = document.getElementById("selected-file-label");
+const elPreviewFrame   = document.getElementById("preview-frame");
+const elPreviewUrlBar  = document.getElementById("preview-url-bar");
+const elDownloadBtn    = document.getElementById("download-btn");
+const elVersionLabel   = document.getElementById("version-label");
+const elTabCode    = document.getElementById("tab-code");
 const elTabPreview = document.getElementById("tab-preview");
-const elCodePanel = document.getElementById("code-panel");
-const elPreviewPanel = document.getElementById("preview-panel");
-const elNewSessionBtn = document.getElementById("new-session-btn");
+const elCodePanel  = document.getElementById("code-panel");
+const elPreviewPanel   = document.getElementById("preview-panel");
+const elNewSessionBtn  = document.getElementById("new-session-btn");
 
 // ── Chat helpers ───────────────────────────────────────────────────────────
 function addMsg(type, text) {
   const div = document.createElement("div");
-  div.className = type === "assistant" ? "msg msg-assistant" : type === "user" ? "msg msg-user" : "msg msg-tool";
+  div.className = type === "assistant" ? "msg msg-assistant"
+                : type === "user"      ? "msg msg-user"
+                                       : "msg msg-tool";
   if (type === "assistant") {
     const span = document.createElement("span");
     span.className = "text";
@@ -50,6 +51,13 @@ function addMsg(type, text) {
     div.textContent = text;
   }
   elMessages.appendChild(div);
+  elMessages.scrollTop = elMessages.scrollHeight;
+  return div;
+}
+
+// Live-update a tool message already in the DOM
+function updateMsg(div, text) {
+  div.textContent = text;
   elMessages.scrollTop = elMessages.scrollHeight;
 }
 
@@ -99,12 +107,11 @@ function renderNode(node, parent) {
 async function loadFile(path) {
   selectedFile = path;
   elSelectedLabel.textContent = path;
-  // Update active state
   document.querySelectorAll(".file-btn").forEach((b) => {
-    b.classList.toggle("active", b.textContent === path.split("/").pop() && b.closest("li")?.querySelector(".file-btn")?.textContent === path.split("/").pop());
+    b.classList.toggle("active", b.textContent === path.split("/").pop());
   });
   if (/\.(png|jpe?g|gif|webp|ico)$/i.test(path)) {
-    elCodeView.textContent = "[binary asset — cannot display]";
+    elCodeView.textContent = "[binary asset]";
     return;
   }
   try {
@@ -125,78 +132,289 @@ function refreshPreview() {
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 elTabCode.addEventListener("click", () => {
-  elTabCode.classList.add("active");
-  elTabPreview.classList.remove("active");
-  elCodePanel.hidden = false;
-  elPreviewPanel.hidden = true;
+  elTabCode.classList.add("active"); elTabPreview.classList.remove("active");
+  elCodePanel.hidden = false; elPreviewPanel.hidden = true;
 });
-
 elTabPreview.addEventListener("click", () => {
-  elTabPreview.classList.add("active");
-  elTabCode.classList.remove("active");
-  elPreviewPanel.hidden = false;
-  elCodePanel.hidden = true;
+  elTabPreview.classList.add("active"); elTabCode.classList.remove("active");
+  elPreviewPanel.hidden = false; elCodePanel.hidden = true;
   if (hasProject) refreshPreview();
 });
 
-// ── Download & new session ─────────────────────────────────────────────────
 elDownloadBtn.addEventListener("click", () => {
   window.location.assign(`${BACKEND}/api/download/${encodeURIComponent(sessionId)}`);
 });
-
 elNewSessionBtn.addEventListener("click", () => {
-  if (!confirm("Start a new session? The current project will be lost.")) return;
+  if (!confirm("Start a new session? Current project will be lost.")) return;
   localStorage.removeItem("anna-vibe-session-id");
   location.reload();
 });
 
-// ── Generation helpers ─────────────────────────────────────────────────────
-const GENERATION_SCHEMA =
-  `{ "files": [ { "path": "index.html", "content": "..." }, { "path": "style.css", "content": "..." }, { "path": "main.js", "content": "..." }, { "path": "screens/home.js", "content": "..." }, { "path": "screens/about.js", "content": "..." }, { "path": "screens/contact.js", "content": "..." }, { "path": "screens/login.js", "content": "..." } ] }`;
-
-const EDIT_SCHEMA = `{ "content": "the complete updated file content" }`;
-
-function buildGenerationPrompt(desc) {
-  return `Generate a complete, professional multi-page vanilla web project for this request: ${desc}
-
-Required pages (always include all 4):
-- screens/home.js   — hero with gradient+picsum background, features grid, "Get Started" CTA → #login
-- screens/about.js  — About Us: origin story, team cards with photos, mission statement
-- screens/contact.js — Contact Us: styled form + address, phone, email
-- screens/login.js  — Login form with email/password + "Continue with Google" button (UI only)
-
-Also add domain-specific pages (ecommerce → products + cart, portfolio → work, restaurant → menu, blog → posts + post-detail, etc.)
-
-Technical requirements:
-- index.html loads Font Awesome 6 CDN, then every screens/*.js <script> tag in order, then main.js
-- main.js routes via window.location.hash and calls window.render*() functions
-- Every page includes a fixed nav bar and a footer with social icons
-- Use CSS variables for consistent colors; picsum.photos/seed/{keyword} for themed images; FA6 for icons
-- Realistic sample content — no lorem ipsum`;
-}
-
-function parseJsonResult(raw) {
-  const text = typeof raw === "string" ? raw : (raw?.content?.text ?? raw?.content ?? "");
-  return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-}
-
-async function callAnnaLLM(userText, systemSuffix) {
-  const systemPrompt = `${skillText}\n\nRequired JSON schema: ${systemSuffix}`;
+// ── Anna LLM core ──────────────────────────────────────────────────────────
+// Calls anna.llm.complete() and parses the JSON result.
+// Does NOT silently swallow errors — callers must handle them.
+async function callAnnaLLM(userText, systemText, maxTokens = 4000) {
+  let result;
   try {
-    const result = await anna.llm.complete({
+    result = await anna.llm.complete({
       messages: [{ role: "user", content: { type: "text", text: userText } }],
-      systemPrompt,
-      maxTokens: 16000,
-      temperature: 0.35,
-      responseFormat: { type: "json_object" },
+      systemPrompt: systemText,
+      maxTokens,
+      temperature: 0.75,
     });
-    const raw = result?.content?.text ?? result?.content ?? result;
-    const text = typeof raw === "string" ? raw : JSON.stringify(raw);
-    return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-  } catch {
-    // LLM unavailable or returned non-JSON (mock/demo mode) — return null to trigger fallback
-    return null;
+  } catch (err) {
+    // Surface Anna-specific errors with actionable messages
+    const msg = err?.message ?? String(err);
+    if (/llm_disabled|no.llm|disabled/i.test(msg)) {
+      throw new Error(
+        "Anna LLM is disabled (running with --no-llm).\n\n" +
+        "To enable real AI generation:\n" +
+        "1. Run: anna-app login --host https://anna.partners\n" +
+        "2. Complete device flow in browser\n" +
+        "3. If 'verified developer required': apply at anna.partners/developers\n" +
+        "4. Restart start-anna.cmd"
+      );
+    }
+    if (/verified developer|not.*developer|developer.*required/i.test(msg)) {
+      throw new Error(
+        "Anna requires verified developer access.\n\n" +
+        "Apply at: https://anna.partners/developers\n" +
+        "Once approved, restart start-anna.cmd"
+      );
+    }
+    if (/unauthorized|401|forbidden|403/i.test(msg)) {
+      throw new Error("Anna authentication failed. Run: anna-app login --host https://anna.partners");
+    }
+    throw err;
   }
+
+  // Anna returns content in several possible shapes — handle all of them
+  let text =
+    result?.content?.[0]?.text    // array of content blocks
+    ?? result?.content?.text       // single block with .text
+    ?? result?.content             // raw string content
+    ?? result?.text                // top-level text
+    ?? result;
+
+  if (typeof text !== "string") text = JSON.stringify(text);
+  // Strip markdown code fences if the model wrapped in ```json…```
+  text = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+  return JSON.parse(text);
+}
+
+// ── Multi-step generation ──────────────────────────────────────────────────
+// Anna builds the site page by page. Each call is focused and short, giving
+// better quality and real progressive output.
+
+const SYSTEM_DESIGNER = `You are an elite creative web designer and front-end developer.
+You MUST always respond with valid JSON only — no markdown, no explanation, no code fences.
+Create stunning, unique, production-quality designs. Never use placeholder/lorem ipsum text.
+${skillText}`;
+
+async function generateDesignSpec(desc) {
+  const prompt = `Client request: "${desc}"
+
+Design a unique website. Be bold and creative — invent something original.
+
+Return JSON with exactly this shape:
+{
+  "name": "brand name (invent one if not specified)",
+  "tagline": "memorable one-line tagline",
+  "palette": {
+    "bg": "#hex (dark background)",
+    "card": "#hex (slightly lighter)",
+    "border": "#hex (subtle border)",
+    "accent": "#hex (strong brand color — the most distinctive choice)",
+    "text": "#hex (near-white for dark bg)",
+    "muted": "#hex (secondary text)"
+  },
+  "googleFont": "exact Google Fonts name (choose one that fits the brand personality)",
+  "pages": ["home", "page2", "page3", "about", "contact", "login"],
+  "siteDescription": "2 sentences describing the site content and target audience",
+  "businessType": "coffee|restaurant|portfolio|saas|ecommerce|fitness|blog|other"
+}
+
+IMPORTANT:
+- pages[] must contain exactly 6 items always ending with: "about", "contact", "login"
+- pages 2 and 3 must be domain-specific (e.g. for coffee: "menu","events"; for ecommerce: "products","cart")
+- palette must use dark theme — bg should be very dark (#0x0x0x range)
+- accent color must be vivid and distinctive, NOT generic blue or white`;
+
+  return callAnnaLLM(prompt, SYSTEM_DESIGNER, 1000);
+}
+
+async function generateCoreFiles(desc, spec) {
+  const prompt = `Build core files for: ${spec.name} — ${spec.tagline}
+Business type: ${spec.businessType}
+Description: ${spec.siteDescription}
+
+Palette: ${JSON.stringify(spec.palette)}
+Google Font: "${spec.googleFont}"
+Pages: ${spec.pages.join(", ")}
+
+Create these 3 files:
+
+1. index.html — Full HTML shell:
+   - <head> loads: Google Fonts API for "${spec.googleFont}" (weights 400,700,900), Font Awesome 6.5 CDN, style.css
+   - <body> has <div id="app"></div>
+   - <script> tags: one for each screens/[page].js in order, then main.js (all type="module" optional but consistent)
+
+2. style.css — Complete stylesheet:
+   - :root CSS variables matching the palette exactly
+   - Base reset, body, scrollbar styling
+   - nav (fixed, blur backdrop), .nav-logo, .nav-links, .nav-cta
+   - .page (min-height: 100vh, padding-top: 64px)
+   - .hero section with background image via picsum.photos
+   - Cards, buttons (.btn-primary, .btn-ghost), forms, footer
+   - At least 2 CSS @keyframes animations (fade-in, slide-up or similar)
+   - Responsive: mobile nav collapses on <768px
+
+3. main.js — SPA router:
+   - Calls window.render[PageName]() for each hash
+   - Renders nav (active states) + page content + footer
+   - Hash-change listener + initial render
+   - nav links built from pages array: ${JSON.stringify(spec.pages)}
+
+Return JSON: { "files": [ { "path": "...", "content": "..." }, ... ] }`;
+
+  return callAnnaLLM(prompt, SYSTEM_DESIGNER, 4000);
+}
+
+async function generatePage(desc, spec, pageName) {
+  const isSpecial = !["about", "contact", "login"].includes(pageName);
+  const hint = {
+    home: "Hero with full-viewport gradient + picsum background, value proposition, features grid (4 cards), CTA section, testimonials or stats row",
+    about: "Brand origin story, team member cards with photos, mission/values section, milestone timeline",
+    contact: "Contact form (name, email, subject, message — JS submit handler), office info cards (location, phone, email), map placeholder, live-chat CTA",
+    login: "Split layout: left side brand imagery + tagline, right side login form with Google SSO button + email/password, sign-up link",
+    menu: "Categorized menu items with prices, dietary badges (vegan/gluten-free), featured item hero, order CTA",
+    products: "Product grid with cards (image, name, price, Add to Cart), filter bar, featured product hero",
+    cart: "Cart items list, order summary sidebar, checkout button, quantity controls, remove button",
+    events: "Upcoming events timeline, event cards with date/time/description, RSVP buttons",
+    features: "Feature showcase grid, comparison table, integration logos, demo video placeholder",
+    pricing: "3-tier pricing cards (free/pro/enterprise), feature checklist, FAQ accordion, CTA",
+    portfolio: "Masonry project grid with hover overlays, category filter tabs, featured project spotlight",
+    work: "Case study cards, skill tags, client logos strip, project detail modal trigger",
+    resume: "Timeline experience + education sections, skills progress bars, download CV button",
+    blog: "Article cards with hero image/excerpt/read-time, category tags, search bar, newsletter signup",
+    posts: "Same as blog",
+    programs: "Program cards with difficulty/duration badges, progress preview, enroll buttons",
+    coaches: "Coach profile cards with photo/bio/specialty, booking buttons",
+    subscribe: "Newsletter hero, benefit list, subscription form, social proof numbers",
+    reservations: "Reservation form (date/time/party-size picker), availability notice, confirmation flow",
+  }[pageName] || "Rich, interactive page with real content matching the brand. Include picsum images, FA6 icons, interactive elements.";
+
+  const prompt = `Generate the "${pageName}" page for: ${spec.name} (${spec.businessType})
+Tagline: ${spec.tagline}
+Description: ${spec.siteDescription}
+
+Palette CSS vars: --bg:${spec.palette.bg}; --card:${spec.palette.card}; --border:${spec.palette.border}; --accent:${spec.palette.accent}; --text:${spec.palette.text}; --muted:${spec.palette.muted};
+
+PAGE CONTENT REQUIREMENTS:
+${hint}
+
+TECHNICAL RULES:
+- Export as: window.render${pageName.charAt(0).toUpperCase() + pageName.slice(1)} = function() { return \`<div class="page">...</div>\`; };
+- Use FA6 icons, picsum.photos/seed/[descriptive-keyword]/[w]/[h] for ALL images
+- Inline ALL styles (use CSS vars + extra inline style="" for layout) — do NOT rely on external classes beyond what style.css provides
+- Interactive: forms submit with JS (event.preventDefault), buttons have onclick handlers, hover effects via onmouseover
+- Content must be REAL, specific, and unique — invent realistic names, prices, descriptions for this specific business
+- NEVER use lorem ipsum
+
+Return JSON: { "path": "screens/${pageName}.js", "content": "complete window.render... function" }`;
+
+  return callAnnaLLM(prompt, SYSTEM_DESIGNER, 3500);
+}
+
+async function generateWithAnna(desc) {
+  const allFiles = [];
+  let specDiv = addMsg("tool", "▸ Anna is designing your website…");
+
+  // Step 1 — Design spec
+  let spec;
+  try {
+    spec = await generateDesignSpec(desc);
+    updateMsg(specDiv, `✓ Design spec: "${spec.name}" · ${spec.googleFont} · accent ${spec.palette.accent}`);
+  } catch (err) {
+    updateMsg(specDiv, `✗ Design spec failed: ${err.message}`);
+    throw new Error(`Anna LLM error at design step: ${err.message}`);
+  }
+
+  // Step 2 — Core files (index.html, style.css, main.js)
+  let coreDiv = addMsg("tool", "▸ Writing index.html, style.css, main.js…");
+  try {
+    const { files } = await generateCoreFiles(desc, spec);
+    allFiles.push(...files);
+    // Write core files to disk so preview updates progressively
+    await writeFiles(files);
+    updateMsg(coreDiv, `✓ Core files written (${files.length} files)`);
+  } catch (err) {
+    updateMsg(coreDiv, `✗ Core files failed: ${err.message}`);
+    throw new Error(`Anna LLM error at core files: ${err.message}`);
+  }
+
+  // Step 3 — Each page
+  for (const page of spec.pages) {
+    const label = `screens/${page}.js`;
+    const pageDiv = addMsg("tool", `▸ Generating ${label}…`);
+    try {
+      const file = await generatePage(desc, spec, page);
+      allFiles.push(file);
+      await writeFiles([file]);
+      // Update file tree and load the last written page
+      await loadFileTree();
+      await loadFile(file.path);
+      updateMsg(pageDiv, `✓ ${label} written`);
+    } catch (err) {
+      updateMsg(pageDiv, `✗ ${label} failed: ${err.message} (skipped)`);
+      // Continue generating remaining pages even if one fails
+    }
+  }
+
+  return { files: allFiles, spec };
+}
+
+// Writes a batch of files to disk via the Agent server
+async function writeFiles(files) {
+  const res = await fetch(`${BACKEND}/api/vibe`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sessionId, files }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error || `Write failed (${res.status})`);
+  return res.json();
+}
+
+// ── Edit helpers ───────────────────────────────────────────────────────────
+async function editWithAnna(instruction, targetPath, currentContent) {
+  const editDiv = addMsg("tool", `▸ Editing ${targetPath}…`);
+  const prompt = `Edit this file: ${targetPath}
+
+Instruction: ${instruction}
+
+CURRENT FILE CONTENT:
+${currentContent}
+
+Return JSON: { "content": "the complete updated file — no truncation, full replacement" }`;
+
+  let result;
+  try {
+    result = await callAnnaLLM(prompt, SYSTEM_DESIGNER, 4000);
+    if (!result?.content || typeof result.content !== "string")
+      throw new Error("Anna returned an unexpected edit format");
+  } catch (err) {
+    updateMsg(editDiv, `✗ Edit failed: ${err.message}`);
+    throw err;
+  }
+
+  const editRes = await fetch(`${BACKEND}/api/edit`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sessionId, path: targetPath, content: result.content }),
+  });
+  if (!editRes.ok) throw new Error((await editRes.json()).error || `Write failed`);
+  updateMsg(editDiv, `✓ ${targetPath} updated`);
+  return targetPath;
 }
 
 // ── Main send handler ──────────────────────────────────────────────────────
@@ -208,36 +426,27 @@ async function handleSend() {
   setBusy(true);
 
   try {
-    if (!anna) throw new Error("Anna AI not connected. Run via: anna-app dev");
+    if (!anna) throw new Error(
+      "Anna AI is not connected.\nRun: start-anna.cmd\n(requires anna-app dev + verified developer access at anna.partners/developers)"
+    );
 
     if (text.startsWith("/vibe")) {
-      const desc = text.replace(/^\/vibe\b/, "").trim() || "a tiny landing page";
-      addMsg("tool", `→ generate_project({ prompt: "${desc}" })`);
+      const desc = text.replace(/^\/vibe\b/, "").trim() || "a creative landing page";
+      addMsg("tool", `→ generate_project("${desc}")`);
+      addMsg("assistant", "Generating with Anna AI — this takes 20–40 seconds as each file is written fresh. Watch the files appear…");
 
-      let parsed = await callAnnaLLM(buildGenerationPrompt(desc), GENERATION_SCHEMA);
-      if (!parsed) {
-        addMsg("tool", "↩ Anna LLM busy — generating locally from your prompt…");
-        parsed = generateSite(desc);
-      }
-
-      const res = await fetch(`${BACKEND}/api/vibe`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId, files: parsed.files }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || `Write failed (${res.status})`);
-      const { filesWritten } = await res.json();
+      const { files, spec } = await generateWithAnna(desc);
 
       hasProject = true;
       projectVersion++;
-      elVersionLabel.textContent = `vibe-project · v${projectVersion}`;
+      elVersionLabel.textContent = `${spec.name} · v${projectVersion}`;
       elDownloadBtn.disabled = false;
-
       await loadFileTree();
       await loadFile("screens/home.js");
 
-      addMsg("tool", `✓ Wrote ${filesWritten.length} files.`);
-      addMsg("assistant", "Done! Your project is ready. Switch to Preview to see it, or describe a change you want.");
+      addMsg("tool", `✓ Done — ${files.length} files written by Anna AI`);
+      addMsg("assistant", `"${spec.name}" is ready! Switch to Preview, or tell me what to change.`);
+
     } else if (hasProject) {
       const target = selectedFile || "screens/home.js";
       addMsg("tool", `→ edit_file("${target}")`);
@@ -248,34 +457,27 @@ async function handleSend() {
       if (!fileRes.ok) throw new Error("Could not read current file");
       const { content: currentContent } = await fileRes.json();
 
-      const parsed = await callAnnaLLM(
-        `Edit ${target}.\n\nInstruction: ${text}\n\nCURRENT FULL CONTENT:\n${currentContent}`,
-        EDIT_SCHEMA,
-      );
-
-      if (!parsed || !parsed.content || typeof parsed.content !== "string")
-        throw new Error("Anna LLM unavailable for edits — try again after connecting a real LLM");
-
-      const editRes = await fetch(`${BACKEND}/api/edit`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId, path: target, content: parsed.content }),
-      });
-      if (!editRes.ok) throw new Error((await editRes.json()).error || `Edit failed (${editRes.status})`);
+      await editWithAnna(text, target, currentContent);
 
       projectVersion++;
-      elVersionLabel.textContent = `vibe-project · v${projectVersion}`;
+      elVersionLabel.textContent = elVersionLabel.textContent.replace(/ · v\d+$/, ` · v${projectVersion}`);
       await loadFile(target);
       elTabPreview.click();
+      addMsg("assistant", "Applied. Preview refreshed — check the right panel.");
 
-      addMsg("tool", `✓ Updated ${target}.`);
-      addMsg("assistant", "Applied your change. Preview refreshed — check the right panel.");
     } else {
-      addMsg("assistant", "Start with /vibe to generate a project first.\n\nExample: /vibe a coffee shop landing page");
+      addMsg("assistant",
+        "Start with /vibe to generate a site.\n\nExamples:\n" +
+        "  /vibe a coffee shop called Morning Brew\n" +
+        "  /vibe a chatting app with dark neon theme\n" +
+        "  /vibe an ecommerce store for handmade jewellery\n" +
+        "  /vibe a fitness app for yoga studios"
+      );
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    addMsg("assistant", `I couldn't complete that: ${msg}`);
+    addMsg("assistant", `Error: ${msg}`);
+    console.error("[anna-vibe]", err);
   } finally {
     setBusy(false);
   }
@@ -288,23 +490,30 @@ elInput.addEventListener("keydown", (e) => {
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
-  // Load the skill prompt from the backend
   try {
     const res = await fetch(`${BACKEND}/api/skill`);
     if (res.ok) skillText = await res.text();
-  } catch { /* backend may not be running yet */ }
+  } catch { /* backend may not be running */ }
 
-  // Connect to Anna's platform
   try {
     anna = await AnnaAppRuntime.connect();
-    addMsg(
-      "assistant",
-      "Hi, I'm Anna. Type /vibe and describe any website — I'll build it from scratch.\n\nExamples:\n/vibe a coffee shop called Morning Brew\n/vibe a chatting app called ConnectHub\n/vibe an ecommerce store for sneakers\n/vibe a designer portfolio for Alex",
+    addMsg("assistant",
+      "Anna is ready. Describe any website and I'll build it from scratch.\n\n" +
+      "  /vibe a coffee shop called Morning Brew\n" +
+      "  /vibe a chatting app with dark neon theme\n" +
+      "  /vibe an ecommerce store for handmade jewellery\n" +
+      "  /vibe a fitness studio landing page\n\n" +
+      "Each file is written by Anna AI — it takes 20-40 seconds and you'll see each file appear."
     );
   } catch (err) {
-    addMsg(
-      "assistant",
-      "⚠️ Anna AI is not available. Make sure you are running this via:\n\n  anna-app dev\n\nand that the Agent server is running:\n\n  node Agent/server.js",
+    console.error("[anna-vibe] Anna connect failed:", err);
+    addMsg("assistant",
+      "⚠️  Anna AI is not connected.\n\n" +
+      "To use this app:\n" +
+      "1. Run: start-anna.cmd\n" +
+      "2. Make sure you have developer access: anna.partners/developers\n" +
+      "3. Login: anna-app login --host https://anna.partners\n\n" +
+      "The site builder requires the Anna AI harness to generate real code."
     );
   }
 }
