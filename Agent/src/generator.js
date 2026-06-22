@@ -64,7 +64,7 @@ function localGeneratedFiles(prompt) {
     {
       path: "package.json",
       content:
-        '{\n  "name": "anna-project",\n  "version": "1.0.0",\n  "private": true,\n  "scripts": {\n    "start": "npx serve ."\n  }\n}\n',
+        '{\n  "name": "anna-project",\n  "version": "1.0.0",\n  "private": true,\n  "scripts": {\n    "start": "npx serve .",\n    "dev": "npx serve ."\n  }\n}\n',
     },
     { path: ".gitignore", content: ".DS_Store\n*.log\nnode_modules/\n" },
     {

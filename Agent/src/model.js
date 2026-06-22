@@ -7,19 +7,22 @@ const loadSkill = () =>
   (skillPromise ??= readFile(path.join(AGENT_ROOT, "skills/vibe-coder.skill.md"), "utf8"));
 
 export function modelIsConfigured() {
-  return Boolean(process.env.ANNA_API_URL && process.env.ANNA_API_KEY && process.env.ANNA_MODEL);
+  return Boolean(process.env.ANNA_API_KEY);
 }
 
 export async function askModel(task, schemaDescription) {
   if (!modelIsConfigured()) return null;
-  const response = await fetch(process.env.ANNA_API_URL, {
+  const apiUrl =
+    process.env.ANNA_API_URL || "https://api.openai.com/v1/chat/completions";
+  const model = process.env.ANNA_MODEL || "gpt-4o";
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       authorization: `Bearer ${process.env.ANNA_API_KEY}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.ANNA_MODEL,
+      model,
       temperature: 0.35,
       max_tokens: 16000,
       response_format: { type: "json_object" },
