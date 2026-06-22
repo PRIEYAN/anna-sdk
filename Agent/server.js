@@ -13,6 +13,7 @@ import {
   AGENT_ROOT,
 } from "./src/workspace.js";
 import { writeProjectFiles, writeFileEdit } from "./src/generator.js";
+import { generateSite } from "../bundle/generator.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 try {
@@ -132,12 +133,19 @@ const server = http.createServer(async (request, response) => {
       return response.end(getSkillText());
     }
 
-    // Receive pre-generated files from the frontend and write them to disk.
-    // Body: { sessionId: string, files: Array<{ path: string, content: string }> }
+    // Accept either:
+    //   { sessionId, files[] }  — pre-generated files from the bundle frontend (port 5180)
+    //   { sessionId, prompt }   — description string from the React frontend (port 3000)
     if (request.method === "POST" && url.pathname === "/api/vibe") {
-      const { sessionId, files } = await readJson(request);
-      if (!sessionId || !Array.isArray(files))
-        return sendJson(response, request, 400, { error: "sessionId and files[] are required" });
+      const body = await readJson(request);
+      const { sessionId } = body;
+      if (!sessionId) return sendJson(response, request, 400, { error: "sessionId is required" });
+      const files = Array.isArray(body.files)
+        ? body.files
+        : typeof body.prompt === "string"
+          ? generateSite(body.prompt).files
+          : null;
+      if (!files) return sendJson(response, request, 400, { error: "files[] or prompt is required" });
       const result = await writeProjectFiles(sessionId, files);
       return sendJson(response, request, 201, result);
     }

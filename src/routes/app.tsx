@@ -50,7 +50,7 @@ function BuildApp() {
     {
       id: "m0",
       type: "assistant",
-      text: "Hi, I'm Anna. Type /vibe followed by a description to generate a tiny vanilla web project. e.g. /vibe a portfolio site for a ceramic artist.",
+      text: "Hi, I'm Anna. Type /vibe and describe any website — I'll build it from scratch.\n\nExamples:\n• /vibe a coffee shop called Morning Brew\n• /vibe a chatting app called ConnectHub\n• /vibe a designer portfolio for Alex\n• /vibe an ecommerce store for sneakers",
     },
   ]);
   const [input, setInput] = useState("");
@@ -141,21 +141,10 @@ function BuildApp() {
           text: "Done. Your real project is in the right panel. Open Preview or ask me for a tweak.",
         });
       } else if (hasProject) {
-        const target = selectedFile || "screens/home.js";
-        pushMsg({ id: `t-${Date.now()}`, type: "tool", text: `→ edit_file("${target}")` });
-        const result = await api<{ path: string; updated: boolean }>("/api/edit", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sessionId, path: target, instruction: text }),
-        });
-        await loadFile(result.path, sessionId);
-        setProjectVersion((version) => version + 1);
-        setRightTab("preview");
-        pushMsg({ id: `done-${Date.now()}`, type: "tool", text: `✓ Updated ${result.path}.` });
         pushMsg({
           id: `a-${Date.now()}`,
           type: "assistant",
-          text: "Applied your change. The preview has been refreshed.",
+          text: "AI edits require the Anna App (port 5180). Run: start-anna.cmd\nThen visit http://localhost:5180 and type your edit there.",
         });
       } else {
         pushMsg({
