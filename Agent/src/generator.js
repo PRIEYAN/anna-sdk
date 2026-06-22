@@ -1,7 +1,15 @@
 import { readProjectFile, replaceProject, writeProjectFile } from "./workspace.js";
 import { askModel } from "./model.js";
 
-const sourcePaths = new Set(["index.html", "style.css", "main.js", "screens/home.js"]);
+const sourcePaths = new Set([
+  "index.html",
+  "style.css",
+  "main.js",
+  "screens/home.js",
+  "screens/about.js",
+  "screens/contact.js",
+  "screens/login.js",
+]);
 const escapeHtml = (value) =>
   String(value).replace(
     /[&<>\"]/g,
@@ -39,9 +47,26 @@ function localGeneratedFiles(prompt) {
     },
     {
       path: "screens/home.js",
-      content: `window.renderHome = function renderHome() {\n  return \`<main><section class="hero"><div class="hero__content"><p class="eyebrow">Made with Anna</p><h1>${title}</h1><p class="lede">${description}</p><div class="actions"><button class="button" data-action="begin">Get started</button><span class="status" data-status>Built with plain HTML, CSS, and JavaScript.</span></div></div></section></main>\`;\n};\n`,
+      content: `window.renderHome = function renderHome() {\n  return \`<main><section class="hero"><div class="hero__content"><p class="eyebrow">Made with Anna</p><h1>${title}</h1><p class="lede">${description}</p><div class="actions"><button class="button" onclick="location.hash='login'">Get started</button></div></div></section></main>\`;\n};\n`,
     },
-    { path: ".gitignore", content: ".DS_Store\n*.log\n" },
+    {
+      path: "screens/about.js",
+      content: `window.renderAbout = function renderAbout() {\n  return \`<main style="padding:48px 24px;max-width:860px;margin:0 auto"><h1>About Us</h1><p>We are a small team passionate about building great things on the web.</p></main>\`;\n};\n`,
+    },
+    {
+      path: "screens/contact.js",
+      content: `window.renderContact = function renderContact() {\n  return \`<main style="padding:48px 24px;max-width:560px;margin:0 auto"><h1>Contact Us</h1><form onsubmit="event.preventDefault()"><input placeholder="Your name" style="display:block;width:100%;margin-bottom:12px;padding:10px;border:1px solid #ccc;border-radius:6px"><input type="email" placeholder="Email" style="display:block;width:100%;margin-bottom:12px;padding:10px;border:1px solid #ccc;border-radius:6px"><textarea placeholder="Message" rows="4" style="display:block;width:100%;margin-bottom:12px;padding:10px;border:1px solid #ccc;border-radius:6px"></textarea><button type="submit" style="padding:12px 24px;background:#2563eb;color:#fff;border:0;border-radius:6px;cursor:pointer">Send</button></form></main>\`;\n};\n`,
+    },
+    {
+      path: "screens/login.js",
+      content: `window.renderLogin = function renderLogin() {\n  return \`<main style="padding:48px 24px;max-width:400px;margin:0 auto"><h1>Sign In</h1><form onsubmit="event.preventDefault()"><input type="email" placeholder="Email" style="display:block;width:100%;margin-bottom:12px;padding:10px;border:1px solid #ccc;border-radius:6px"><input type="password" placeholder="Password" style="display:block;width:100%;margin-bottom:12px;padding:10px;border:1px solid #ccc;border-radius:6px"><button type="submit" style="width:100%;padding:12px;background:#2563eb;color:#fff;border:0;border-radius:6px;cursor:pointer;margin-bottom:8px">Sign In</button><button type="button" style="width:100%;padding:12px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:6px;cursor:pointer">Continue with Google</button></form></main>\`;\n};\n`,
+    },
+    {
+      path: "package.json",
+      content:
+        '{\n  "name": "anna-project",\n  "version": "1.0.0",\n  "private": true,\n  "scripts": {\n    "start": "npx serve ."\n  }\n}\n',
+    },
+    { path: ".gitignore", content: ".DS_Store\n*.log\nnode_modules/\n" },
     {
       path: "public/favicon.svg",
       content: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#24201c"/><path d="M16 7c1 5 4 8 9 9-5 1-8 4-9 9-1-5-4-8-9-9 5-1 8-4 9-9Z" fill="#f7f2e9"/></svg>\n`,
@@ -62,13 +87,28 @@ function localGeneratedFiles(prompt) {
 
 export async function generateProject(sessionId, prompt) {
   const modelResult = await askModel(
-    `Generate a complete multi-page vanilla web project for this request: ${prompt}\n\nRequirements:\n- Generate the correct number of screens for the site type (ecommerce = home + products + cart, portfolio = home + work + contact, etc.)\n- index.html must load every screens/*.js file as a <script> tag before main.js\n- main.js must implement hash-based routing that maps each screen to its window.render*() function\n- Include realistic sample content, navigation, and a footer on every page`,
-    `{ "files": [ { "path": "index.html", "content": "..." }, { "path": "style.css", "content": "..." }, { "path": "main.js", "content": "..." }, { "path": "screens/home.js", "content": "..." }, { "path": "screens/products.js", "content": "..." } ] } — include one entry per file, all paths relative, screens/ files named after their page`,
+    `Generate a complete, professional multi-page vanilla web project for this request: ${prompt}
+
+Required pages (always include all 4):
+- screens/home.js   — hero with gradient+picsum background, features, "Get Started" CTA → #login
+- screens/about.js  — About Us: story, team cards, mission
+- screens/contact.js — Contact Us: form + contact info
+- screens/login.js  — Login form + Google OAuth button (UI only)
+
+Also add domain-specific pages on top (ecommerce → products + cart, portfolio → work, restaurant → menu, blog → posts + post, etc.)
+
+Technical requirements:
+- index.html loads Font Awesome 6 CDN, then every screens/*.js <script> tag, then main.js
+- main.js routes all pages via window.location.hash and window.render*() functions
+- Every page has a fixed nav bar and a footer with social icons
+- Use CSS variables for consistent colors, picsum.photos/seed/ for images, FA6 for icons
+- Realistic sample content — no lorem ipsum`,
+    `{ "files": [ { "path": "index.html", "content": "..." }, { "path": "style.css", "content": "..." }, { "path": "main.js", "content": "..." }, { "path": "screens/home.js", "content": "..." }, { "path": "screens/about.js", "content": "..." }, { "path": "screens/contact.js", "content": "..." }, { "path": "screens/login.js", "content": "..." } ] }`,
   );
   const sourceFiles = modelResult
     ? validateGeneratedFiles(modelResult.files)
-    : localGeneratedFiles(prompt).slice(0, 4);
-  const files = [...sourceFiles, ...localGeneratedFiles(prompt).slice(4)];
+    : localGeneratedFiles(prompt).slice(0, 7);
+  const files = [...sourceFiles, ...localGeneratedFiles(prompt).slice(7)];
   await replaceProject(sessionId, files);
   return { filesWritten: files.map(({ path }) => path) };
 }

@@ -20,6 +20,10 @@ test("generates the fixed vanilla project structure", async () => {
     "style.css",
     "main.js",
     "screens/home.js",
+    "screens/about.js",
+    "screens/contact.js",
+    "screens/login.js",
+    "package.json",
     ".gitignore",
     "public/favicon.svg",
     "public/icons.svg",
@@ -44,6 +48,7 @@ test("lists and reads project files through JSON-RPC", async () => {
     params: { sessionId, path: "screens/home.js" },
   });
   assert.match(read.result.content, /Ceramic Artist Portfolio/);
+  assert.match(read.result.content, /login/);
 });
 
 test("edits the most relevant source file", async () => {
