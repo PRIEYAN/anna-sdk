@@ -21,6 +21,7 @@ export async function askModel(task, schemaDescription) {
     body: JSON.stringify({
       model: process.env.ANNA_MODEL,
       temperature: 0.35,
+      max_tokens: 16000,
       response_format: { type: "json_object" },
       messages: [
         {

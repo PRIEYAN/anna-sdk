@@ -62,8 +62,8 @@ function localGeneratedFiles(prompt) {
 
 export async function generateProject(sessionId, prompt) {
   const modelResult = await askModel(
-    `Generate a complete project for this request: ${prompt}`,
-    `{ "files": [{ "path": "index.html | style.css | main.js | screens/<page>.js", "content": "complete file content" }] }`,
+    `Generate a complete multi-page vanilla web project for this request: ${prompt}\n\nRequirements:\n- Generate the correct number of screens for the site type (ecommerce = home + products + cart, portfolio = home + work + contact, etc.)\n- index.html must load every screens/*.js file as a <script> tag before main.js\n- main.js must implement hash-based routing that maps each screen to its window.render*() function\n- Include realistic sample content, navigation, and a footer on every page`,
+    `{ "files": [ { "path": "index.html", "content": "..." }, { "path": "style.css", "content": "..." }, { "path": "main.js", "content": "..." }, { "path": "screens/home.js", "content": "..." }, { "path": "screens/products.js", "content": "..." } ] } — include one entry per file, all paths relative, screens/ files named after their page`,
   );
   const sourceFiles = modelResult
     ? validateGeneratedFiles(modelResult.files)
@@ -74,7 +74,9 @@ export async function generateProject(sessionId, prompt) {
 }
 
 export async function editProjectFile(sessionId, requestedPath, instruction) {
-  let target = sourcePaths.has(requestedPath) ? requestedPath : "screens/home.js";
+  const isAllowedPath =
+    sourcePaths.has(requestedPath) || /^screens\/[a-zA-Z0-9_-]+\.js$/.test(requestedPath);
+  let target = isAllowedPath ? requestedPath : "screens/home.js";
   if (
     /\b(color|colour|background|font|spacing|size|blue|red|green|purple|orange|pink)\b/i.test(
       instruction,
