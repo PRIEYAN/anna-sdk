@@ -151,30 +151,20 @@ elNewSessionBtn.addEventListener("click", () => {
 });
 
 
-// ── Multi-step generation ──────────────────────────────────────────────────
-// Each file is its own LLM call using RAW output (no JSON wrapper).
-// This avoids the truncation caused by Anna's ~2000-token output cap
-// when large files are embedded inside a JSON string.
+// ── Generation ────────────────────────────────────────────────────────────
+// Single landing page per prompt — one LLM call, one HTML file.
+// maxTokens:2000 ensures the model has budget left after any internal thinking.
 
-function systemJson() {
+function systemRaw() {
   return (
-    "You are an elite creative web designer and front-end developer.\n" +
-    "DO NOT use extended thinking. Output immediately and directly.\n" +
-    "Respond with ONLY a raw JSON object. No markdown, no fences, no explanation.\n" +
-    "First character must be { and last must be }.\n"
+    "You are an expert creative frontend developer.\n" +
+    "DO NOT think or reason internally. Output code immediately.\n" +
+    "Output ONLY the raw file content. No markdown fences. No explanation. No preamble."
   );
 }
 
-function systemRaw(fileType) {
-  return (
-    `You are an expert ${fileType} developer. Output ONLY the raw file content.\n` +
-    "DO NOT use extended thinking. Output immediately.\n" +
-    "No markdown fences, no explanation, no preamble. Start with the first line of the file.\n"
-  );
-}
-
-// Calls Anna and returns the raw text (not parsed as JSON).
-async function callAnnaRaw(userText, systemText, maxTokens = 1800) {
+// Calls Anna and returns raw text (no JSON.parse).
+async function callAnnaRaw(userText, systemText, maxTokens = 2000) {
   const messageText = "/no_think\n" + userText;
   let result;
   try {
@@ -212,139 +202,45 @@ async function callAnnaRaw(userText, systemText, maxTokens = 1800) {
   return text.replace(/^```[\w]*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
 }
 
-// Design spec — small JSON response, stays well within token cap
-async function generateDesignSpec(desc) {
-  const prompt =
-    `Client request: "${desc}"\n\n` +
-    `Create a bold, original design spec. Return exactly this JSON (no other text):\n` +
-    `{"name":"brand name","tagline":"one-line tagline",` +
-    `"palette":{"bg":"#hex","card":"#hex","border":"#hex","accent":"#hex","text":"#hex","muted":"#hex"},` +
-    `"googleFont":"Google Font name","pages":["home","p2","p3","about","contact","login"],` +
-    `"siteDescription":"2 sentences","businessType":"ecommerce|coffee|restaurant|portfolio|saas|fitness|blog|other"}\n\n` +
-    `Rules: dark bg, vivid accent (not blue/white), pages[1] and [2] must be domain-specific ` +
-    `(ecommerce→products+cart, coffee→menu+events, fitness→programs+coaches, saas→features+pricing, etc.)`;
-
-  const raw = await callAnnaRaw(prompt, systemJson(), 800);
-  return JSON.parse(raw);
-}
-
-// Generate a single file as raw text output
-async function generateOneFile(spec, filePath, hint, maxTokens = 1800) {
-  const ext = filePath.split(".").pop();
-  const isPage = filePath.startsWith("screens/");
-  const pageName = isPage ? filePath.replace("screens/", "").replace(".js", "") : "";
-  const cap = `${pageName.charAt(0).toUpperCase()}${pageName.slice(1)}`;
-
-  const ctx =
-    `Site: ${spec.name} — ${spec.tagline}\n` +
-    `Type: ${spec.businessType}\n` +
-    `Colors: bg=${spec.palette.bg} card=${spec.palette.card} border=${spec.palette.border} ` +
-    `accent=${spec.palette.accent} text=${spec.palette.text} muted=${spec.palette.muted}\n` +
-    `Font: ${spec.googleFont}\n` +
-    `Pages: ${spec.pages.join(", ")}`;
-
-  let prompt;
-  if (filePath === "index.html") {
-    prompt =
-      `${ctx}\n\nGenerate index.html:\n` +
-      `- <head>: charset, viewport, title="${spec.name}", ` +
-      `Google Fonts link for "${spec.googleFont}" weights 400;700;900, ` +
-      `Font Awesome 6.5 all.min.css CDN, <link rel="stylesheet" href="style.css">\n` +
-      `- <body>: <div id="app"></div>\n` +
-      `- Scripts (no type=module): ${spec.pages.map(p => `<script src="screens/${p}.js"></script>`).join(" ")} ` +
-      `<script src="main.js"></script>`;
-  } else if (filePath === "style.css") {
-    prompt =
-      `${ctx}\n\nGenerate style.css. Use these exact CSS variables in :root.\n` +
-      `Include: reset, body font-family "${spec.googleFont}", fixed nav with blur backdrop, ` +
-      `.page{min-height:100vh;padding-top:64px}, .sv-hero with gradient overlay + picsum bg-image, ` +
-      `.sv-section{max-width:1100px;margin:0 auto;padding:80px 40px}, ` +
-      `.sv-card, .sv-btn (accent bg), .sv-btn-ghost, ` +
-      `form inputs (.sv-input), footer with 4-col grid, ` +
-      `@keyframes fadeIn + slideUp, responsive @media(max-width:768px).\n` +
-      `Keep it ~120 lines. No inline comments.`;
-  } else if (filePath === "main.js") {
-    prompt =
-      `${ctx}\n\nGenerate main.js — hash-based SPA router.\n` +
-      `- nav() builds fixed nav with logo, links for each page, CTA button\n` +
-      `- footer() builds footer with brand, 3 link cols, social icons\n` +
-      `- route() reads location.hash, calls window.render[Page](), renders nav+page+footer into #app\n` +
-      `- window.addEventListener("hashchange", route); route();\n` +
-      `Active nav link = current hash. No external dependencies.`;
-  } else if (isPage) {
-    const pageHints = {
-      home: "Full-viewport hero (gradient + picsum bg-image), stats row, 4-feature cards grid, CTA banner",
-      about: "Brand story section, team cards with picsum photos, values grid, timeline",
-      contact: "Contact form with JS submit handler, 3 info cards (address/phone/email), map placeholder",
-      login: "Split layout: left=brand image+tagline, right=login form (Google SSO btn + email/pw + signup link)",
-      menu: "Category sections with item rows (name, description, price, dietary icons)",
-      products: "Product cards grid (picsum image, name, price, Add-to-Cart btn with onclick)",
-      cart: "Cart items list + order summary sidebar + checkout btn",
-      events: "Event cards (date badge, title, description, RSVP btn)",
-      features: "Feature cards grid, comparison table, integration logos",
-      pricing: "3-tier pricing cards (free/pro/enterprise) with feature lists and CTA btns",
-      programs: "Program cards with difficulty badge, duration, description, enroll btn",
-      coaches: "Coach cards with picsum photo, name, specialty, booking btn",
-      portfolio: "Project grid with hover overlays, filter tabs",
-      work: "Case study cards with tags, featured project spotlight",
-      resume: "Experience + education timeline, skills list, download CV btn",
-      blog: "Article cards (picsum img, title, excerpt, read-time, category tag)",
-      posts: "Article cards grid with search bar",
-      subscribe: "Newsletter hero, benefits list, email form",
-      reservations: "Reservation form (date, time, party size), confirmation flow",
-    };
-    prompt =
-      `${ctx}\n\nGenerate screens/${pageName}.js.\n` +
-      `Required: window.render${cap} = function() { return \`<div class="page">...</div>\`; };\n` +
-      `Content: ${pageHints[pageName] || "Rich content page with real data for this business"}\n` +
-      `Rules: inline all styles using the CSS vars, picsum.photos/seed/[keyword]/[w]/[h] for images, ` +
-      `FA6 icons, real invented content (names/prices/descriptions), no lorem ipsum, ` +
-      `interactive (forms preventDefault, buttons onclick).`;
-  } else {
-    prompt = `${ctx}\n\n${hint}`;
-  }
-
-  const content = await callAnnaRaw(prompt, systemRaw(ext), maxTokens);
-  return { path: filePath, content };
-}
-
 async function generateWithAnna(desc) {
-  const allFiles = [];
+  const div = addMsg("tool", "▸ Anna is crafting your landing page…");
 
-  // Step 1 — Design spec (JSON)
-  const specDiv = addMsg("tool", "▸ Anna is designing your website…");
-  let spec;
+  const prompt =
+    `Create a complete, creative single-page landing page HTML file for: "${desc}"\n\n` +
+    `Requirements:\n` +
+    `- Invent a bold brand name and memorable tagline for this business\n` +
+    `- All CSS inside a <style> tag in <head>; all JS inside a <script> tag before </body>\n` +
+    `- Dark background (#0d0d0d or similar), a vivid unique accent color, near-white body text\n` +
+    `- Google Fonts API <link> in <head> (choose a font that fits the brand personality)\n` +
+    `- Font Awesome 6.5 CDN <link> in <head> for icons\n` +
+    `- Sections (in order): sticky nav, full-height hero with gradient overlay, ` +
+    `3-column features section, a stats/testimonial row, a CTA section, footer\n` +
+    `- CSS @keyframes animations (fadeIn, slideUp); smooth hover transitions on buttons and cards\n` +
+    `- Real invented content — names, descriptions, numbers — nothing generic or lorem ipsum\n` +
+    `- Fully responsive (mobile-friendly with @media queries)\n\n` +
+    `Output raw HTML only. Start with <!DOCTYPE html>. No explanation text.`;
+
+  let html;
   try {
-    spec = await generateDesignSpec(desc);
-    updateMsg(specDiv, `✓ Design: "${spec.name}" · ${spec.googleFont} · accent ${spec.palette.accent}`);
+    html = await callAnnaRaw(prompt, systemRaw(), 2000);
   } catch (err) {
-    updateMsg(specDiv, `✗ Design spec failed: ${err.message}`);
-    throw new Error(`Anna LLM error at design step: ${err.message}`);
+    updateMsg(div, `✗ Failed: ${err.message}`);
+    throw err;
   }
 
-  // Steps 2–N — one file per LLM call, raw output
-  const filePlan = [
-    { path: "index.html", maxTok: 600 },
-    { path: "style.css",  maxTok: 1800 },
-    { path: "main.js",    maxTok: 1400 },
-    ...spec.pages.map(p => ({ path: `screens/${p}.js`, maxTok: 1800 })),
-  ];
-
-  for (const { path, maxTok } of filePlan) {
-    const div = addMsg("tool", `▸ Writing ${path}…`);
-    try {
-      const file = await generateOneFile(spec, path, "", maxTok);
-      allFiles.push(file);
-      await writeFiles([file]);
-      await loadFileTree();
-      if (path.startsWith("screens/")) await loadFile(path);
-      updateMsg(div, `✓ ${path}`);
-    } catch (err) {
-      updateMsg(div, `✗ ${path} failed: ${err.message} (skipped)`);
-    }
+  // Ensure we got something that looks like HTML
+  if (!html.includes("<")) {
+    updateMsg(div, "✗ Anna returned unexpected content (not HTML)");
+    throw new Error("Anna did not return HTML. Check DevTools console for the raw response.");
   }
 
-  return { files: allFiles, spec };
+  const file = { path: "index.html", content: html };
+  await writeFiles([file]);
+  await loadFileTree();
+  await loadFile("index.html");
+  updateMsg(div, "✓ Landing page ready");
+
+  return { files: [file], spec: { name: desc } };
 }
 
 // Writes a batch of files to disk via the Agent server
@@ -369,7 +265,7 @@ async function editWithAnna(instruction, targetPath, currentContent) {
 
   let updated;
   try {
-    updated = await callAnnaRaw(prompt, systemRaw(ext), 1800);
+    updated = await callAnnaRaw(prompt, systemRaw(), 2000);
   } catch (err) {
     updateMsg(editDiv, `✗ Edit failed: ${err.message}`);
     throw err;
@@ -401,7 +297,7 @@ async function handleSend() {
     if (text.startsWith("/vibe")) {
       const desc = text.replace(/^\/vibe\b/, "").trim() || "a creative landing page";
       addMsg("tool", `→ generate_project("${desc}")`);
-      addMsg("assistant", "Generating with Anna AI — this takes 20–40 seconds as each file is written fresh. Watch the files appear…");
+      addMsg("assistant", "Anna AI is building your landing page — takes ~15 seconds…");
 
       const { files, spec } = await generateWithAnna(desc);
 
@@ -471,7 +367,7 @@ async function boot() {
       "  /vibe a chatting app with dark neon theme\n" +
       "  /vibe an ecommerce store for handmade jewellery\n" +
       "  /vibe a fitness studio landing page\n\n" +
-      "Each file is written by Anna AI — it takes 20-40 seconds and you'll see each file appear."
+      "Anna builds a unique landing page for each prompt — takes ~15 seconds."
     );
   } catch (err) {
     console.error("[anna-vibe] Anna connect failed:", err);
